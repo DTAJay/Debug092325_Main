@@ -1,7 +1,7 @@
-import { stringToBool } from "@/utils/Functions";
+import { boolean } from "boolean";
 
 // import env
-export const DEBUG_MODE = stringToBool(import.meta.env.VITE_DEBUG_MODE);
+export const DEBUG_MODE = boolean(import.meta.env.VITE_DEBUG_MODE);
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -16,6 +16,6 @@ export const SCHEDULED_JSON_KEY = "scheduled_json"; //  the key name of localSto
 export const GA4_EVENT_SLOT_TRANSITION = "slot_transition";
 
 // ad position
-export const AD_POSITION_TOP = 'top';
+export const AD_POSITION_TOP = "top";
 
 export const AD_POSITION_BOTTOM = "bottom";
