@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
+import _ from "lodash";
 
 import ScheduleService from "@/services/Schedule";
 
-import { isEmpty, getIndexFromArr } from "@/utils/Functions";
 import {
   SCHEDULED_JSON_KEY,
   SCREEN_ID,
@@ -11,14 +11,15 @@ import {
   AD_POSITION_BOTTOM,
   AD_POSITION_TOP,
 } from "@/utils/Constants";
-import preloadImage from "@/utils/PreloadImage";
+import CachedImage from "@/utils/CachedImage";
 import GoogleAnalytics from "@/utils/GoogleAnalytics";
 
 // get given slot's duration
 const getSlotDuration = (slots, index) => {
   if (index >= slots.length) {
     return -1;
-  } else if (index === slots.length - 1) {  // if the given slot is last one, return its duration same as previous
+  } else if (index === slots.length - 1) {
+    // if the given slot is last one, return its duration same as previous
     return slots[index].timestamp - slots[index - 1].timestamp;
   } else {
     return slots[index + 1].timestamp - slots[index].timestamp;
@@ -55,6 +56,9 @@ const isExpiredSlots = (slots) => {
 const Home = () => {
   const [schedules, setSchedules] = useState({}); // schedule data
   const [currentSlot, setCurrentSlot] = useState({}); // current displaying slot
+  const [currentAdImage, setCurrentAdImage] = useState("");
+  const [currentFooterImage, setCurrentFooterImage] = useState("");
+  const [preloadedSlotIndex, setPreloadedSlotIndex] = useState();
 
   // call when should load new remote json
   const getRemoteJson = () => {
@@ -101,9 +105,7 @@ const Home = () => {
         if (!isExpiredSlots(slots)) {
           setCurrentSlot(slots[getCurrentSlotIndex(slots)]);
         } else {
-          console.log(
-            "Please request updating schedule to administrator!"
-          );
+          console.log("Please request updating schedule to administrator!");
         }
       })
       .catch((err) => {
@@ -121,7 +123,7 @@ const Home = () => {
       localStorage.getItem(SCHEDULED_JSON_KEY) || "{}"
     ); // get local schedule json.
 
-    if (isEmpty(scheduleData)) {
+    if (_.isEmpty(scheduleData)) {
       getRemoteJson(); // if not exist yet, fetch json from remote
     } else {
       if (isExpiredSlots(scheduleData.slots)) {
@@ -139,14 +141,69 @@ const Home = () => {
 
   // call when should update the current slot
   useEffect(() => {
-    if (isEmpty(currentSlot)) {
+    if (_.isEmpty(currentSlot)) {
       return;
     }
 
+    let nextSlotIndex =
+      _.findIndex(
+        schedules.slots,
+        (e) => {
+          return e?.id === currentSlot.id;
+        },
+        0
+      ) + 1;
+
+    // preload images for the next 50 slots
+    if (preloadedSlotIndex === undefined) {
+      let currentPreloadedIndex = nextSlotIndex - 1;
+      let preloadingIndex = currentPreloadedIndex + 50;
+      for (; currentPreloadedIndex < preloadingIndex; currentPreloadedIndex++) {
+        const slot = schedules.slots[currentPreloadedIndex];
+        CachedImage.add(slot.adImageUrl, schedules.adWidth, schedules.adHeight);
+        CachedImage.add(
+          slot.footerImageUrl,
+          schedules.footerWidth,
+          schedules.footerHeight
+        );
+      }
+      setPreloadedSlotIndex(preloadingIndex);
+    } else if (preloadedSlotIndex < schedules.slots.length) {
+      CachedImage.add(
+        schedules.slots[preloadedSlotIndex + 1].adImageUrl,
+        schedules.adWidth,
+        schedules.adHeight
+      );
+      CachedImage.add(
+        schedules.slots[preloadedSlotIndex + 1].footerImageUrl,
+        schedules.footerWidth,
+        schedules.footerHeight
+      );
+      setPreloadedSlotIndex(preloadedSlotIndex + 1);
+    }
+
+    // get current ad image from cache
+    CachedImage.get(
+      currentSlot?.adImageUrl,
+      schedules.adWidth,
+      schedules.adHeight
+    ).then(
+      (data) => setCurrentAdImage(data),
+      () => setCurrentAdImage("")
+    );
+
+    // get current footer image from cache
+    CachedImage.get(
+      currentSlot?.footerImageUrl,
+      schedules.footerWidth,
+      schedules.footerHeight
+    ).then(
+      (data) => setCurrentFooterImage(data),
+      () => setCurrentFooterImage("")
+    );
+
     DEBUG_MODE && console.log(currentSlot);
 
-    let nextSlotIndex =
-      getIndexFromArr(schedules.slots, "id", currentSlot.id) + 1;
     // update the current slot
     const transitionSlot = () => {
       if (nextSlotIndex >= schedules.slots.length) {
@@ -158,27 +215,21 @@ const Home = () => {
       setCurrentSlot(schedules.slots[nextSlotIndex]); // update the slot to be displayed
     };
 
-    // preload images for next slot
-    if (nextSlotIndex < schedules.slots.length) {
-      preloadImage(schedules?.slots[nextSlotIndex].adImageUrl);
-      preloadImage(schedules?.slots[nextSlotIndex].footerImageUrl);
-    }
-
     let timeout = setTimeout(
       transitionSlot,
       getSlotDuration(schedules.slots, nextSlotIndex - 1) -
         (new Date().getTime() - currentSlot.timestamp)
     ); // call callback after remained time
 
+    // send ad-play event
     GoogleAnalytics.emitEvent(GA4_EVENT_SLOT_TRANSITION, {
-      // send ad-play event
       advertiser_id: currentSlot.adAdvertiserId, // custom dimension - advertiser's id
       ad_position: AD_POSITION_TOP, // custom dimension - ad's position
       device_id: currentSlot.deviceId, // custom dimension - device's id
       screen_id: schedules.screenId, // custom dimension - screen's id
     });
+    // send footer-play event
     GoogleAnalytics.emitEvent(GA4_EVENT_SLOT_TRANSITION, {
-      // send footer-play event
       advertiser_id: currentSlot.footerAdvertiserId,
       ad_position: AD_POSITION_BOTTOM,
       device_id: currentSlot.deviceId,
@@ -196,21 +247,21 @@ const Home = () => {
         className="rotate-90 origin-bottom-left"
         style={{ marginTop: schedules.screenHeight * -1 + "px" }}
       >
-        {currentSlot?.adImageUrl && (
+        {currentAdImage && (
           <div
             id="ad"
             style={{
-              backgroundImage: `url(${currentSlot?.adImageUrl})`,
+              backgroundImage: `url(${currentAdImage})`,
               width: schedules.adWidth + "px",
               height: schedules.adHeight + "px",
             }}
           ></div>
         )}
-        {currentSlot?.footerImageUrl && (
+        {currentFooterImage && (
           <div
             id="footer"
             style={{
-              backgroundImage: `url(${currentSlot?.footerImageUrl})`,
+              backgroundImage: `url(${currentFooterImage})`,
               width: schedules.footerWidth + "px",
               height: schedules.footerHeight + "px",
             }}
