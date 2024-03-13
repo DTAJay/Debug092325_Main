@@ -98,14 +98,13 @@ const Home = () => {
         };
         /// END parsing from remote format to local format ///
 
-        localStorage.setItem(SCHEDULED_JSON_KEY, JSON.stringify(tempSchedules));
-
-        setSchedules(tempSchedules);
-
         if (!isExpiredSlots(slots)) {
+          localStorage.setItem(SCHEDULED_JSON_KEY, JSON.stringify(tempSchedules));  
+          setSchedules(tempSchedules);
           setCurrentSlot(slots[getCurrentSlotIndex(slots)]);
         } else {
           console.log("Please request updating schedule to administrator!");
+          setTimeout(getRemoteJson, 180000);  // retry to fetch after 3 minutes
         }
       })
       .catch((err) => {
@@ -114,6 +113,7 @@ const Home = () => {
             "Sorry, but an error has been ocurred while parsing schedule list!",
             err
           );
+          setTimeout(getRemoteJson, 30000); // retry to fetch after 30 seconds
       });
   };
 
@@ -154,10 +154,13 @@ const Home = () => {
         0
       ) + 1;
 
-    // preload images for the next 50 slots
+    // preload images for the next 120 slots
     if (preloadedSlotIndex === undefined) {
       let currentPreloadedIndex = nextSlotIndex - 1;
-      let preloadingIndex = currentPreloadedIndex + 50;
+      let preloadingIndex = currentPreloadedIndex + 120;
+      if(preloadingIndex >= schedules.slots.length) {
+        preloadingIndex = schedules.slots.length - 1;
+      }
       for (; currentPreloadedIndex < preloadingIndex; currentPreloadedIndex++) {
         const slot = schedules.slots[currentPreloadedIndex];
         CachedImage.add(slot.adImageUrl, schedules.adWidth, schedules.adHeight);
@@ -168,7 +171,7 @@ const Home = () => {
         );
       }
       setPreloadedSlotIndex(preloadingIndex);
-    } else if (preloadedSlotIndex < schedules.slots.length) {
+    } else if (preloadedSlotIndex < schedules.slots.length - 1) {
       CachedImage.add(
         schedules.slots[preloadedSlotIndex + 1].adImageUrl,
         schedules.adWidth,

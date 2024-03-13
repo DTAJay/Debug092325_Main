@@ -41,7 +41,7 @@ $ ssh [username]@[ip address]
 ### 7. Move DTA directory to /var/www/html
 
 ```bash
-$ mv DTA /var/www/html
+$ sudo mv DTA /var/www/html
 ```
 
 ### 8. Change lighttpd service's document root
@@ -78,7 +78,7 @@ sudo nano /boot/fullpageos.txt
 
 #### - Change url
 
-`http://localhost`
+`http://localhost/`
 
 ### 11. Reboot device
 
