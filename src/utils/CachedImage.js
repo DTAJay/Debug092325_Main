@@ -1,7 +1,7 @@
 import _ from "lodash";
 
 let cache = [];
-const SIZE_OF_CACHE = 100;  // max limit is 100
+const SIZE_OF_CACHE = 50;  // max limit is 50
 
 // get the index of element which has minimal value
 const findMinIndex = (array, key) => {
@@ -82,8 +82,7 @@ const get = (url, width, height) => {
 
 const CachedImage = {
   add,
-  get,
-  cache,
+  get
 };
 
 export default CachedImage;
