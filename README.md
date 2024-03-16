@@ -41,7 +41,7 @@ $ ssh [username]@[ip address]
 ### 7. Move DTA directory to /var/www/html
 
 ```bash
-$ sudo mv DTA /var/www/html
+$ sudo mv DTA /var/www/html/
 ```
 
 ### 8. Change lighttpd service's document root
@@ -80,7 +80,21 @@ sudo nano /boot/fullpageos.txt
 
 `http://localhost/`
 
-### 11. Reboot device
+### 11. Disable chromium browser extensions for google analytics
+
+#### - Open start_chromium_browser file
+
+```bash
+sudo nano ~/scripts/start_chromium_browser
+```
+
+#### - Add --disable-extensions flag to chromium-browser command at the following two lines
+
+```chromium-browser --disable-extensions --kiosk --touch-events...```
+
+```chromium-browser --disable-extensions --enable-logging --log-level...```
+
+### 12. Reboot device
 
 ```bash
 sudo reboot
