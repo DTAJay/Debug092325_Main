@@ -212,7 +212,8 @@ const Home = () => {
       if (nextSlotIndex >= schedules.slots.length) {
         // no more slot for this period
         localStorage.removeItem(SCHEDULED_JSON_KEY);
-        getRemoteJson(); // load new json for new period
+        // getRemoteJson(); // load new json for new period
+        window.location.reload();
         return;
       }
       setCurrentSlot(schedules.slots[nextSlotIndex]); // update the slot to be displayed
