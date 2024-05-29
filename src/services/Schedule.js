@@ -7,7 +7,7 @@ const _API = ""; // prefix url for schedule api
 const getSchedule = () => {
   return new Promise((resolve, reject) => {
     http
-      .get(_API + `/screen?screen=${SCREEN_ID}`) // method: GET
+      .get(_API + `/dtascreens/${SCREEN_ID}`) // method: GET
       .then((response) => {
         // if api call has been succeeded
         if (response.status === 200) {
