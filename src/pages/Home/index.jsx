@@ -65,7 +65,7 @@ const Home = () => {
     // call the axios instance for fetching the remote json
     ScheduleService.getSchedule()
       .then((res) => {
-        const remoteJson = JSON.parse(res.data); // parse schedules from string to json
+        const remoteJson = res.data;
         let slots = []; // init slots array
 
         /// START parsing from remote format to local format ///

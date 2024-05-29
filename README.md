@@ -20,7 +20,7 @@ $ yarn install
 | Variable name                 | Description                               | Default value
 | ---                           | ---                                       | ---
 | VITE_DEBUG_MODE               | true: dev, false: prod                    | false
-| VITE_API_BASE_URL             | AWS Lambda API                            | https://api.digitaltableadvertising.com
+| VITE_API_BASE_URL             | AWS Lambda API                            | https://api2.digitaltableadvertising.com
 | VITE_SCREEN_ID                | Screen of device which run this build     | 00000002
 | VITE_MASTER_MEASUREMENT_ID    | Measurement id for google analytics 4     | G-K1RRDV446K
 
