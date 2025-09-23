@@ -53,16 +53,26 @@ const isExpiredSlots = (slots) => {
   );
 };
 
+import DebugInfo from "@/components/DebugInfo";
+
 const Home = () => {
   const [schedules, setSchedules] = useState({}); // schedule data
   const [currentSlot, setCurrentSlot] = useState({}); // current displaying slot
   const [currentAdImage, setCurrentAdImage] = useState("");
   const [currentFooterImage, setCurrentFooterImage] = useState("");
   const [preloadedSlotIndex, setPreloadedSlotIndex] = useState();
+  const [debugData, setDebugData] = useState(null);
 
   // call when should load new remote json
   const getRemoteJson = () => {
     // call the axios instance for fetching the remote json
+    setDebugData({
+      ...debugData,
+      lastApiCall: {
+        status: "loading",
+        timestamp: new Date().toISOString(),
+      },
+    });
     ScheduleService.getSchedule()
       .then((res) => {
         const remoteJson = res.data;
@@ -99,16 +109,43 @@ const Home = () => {
         /// END parsing from remote format to local format ///
 
         if (!isExpiredSlots(slots)) {
+          setDebugData({
+            ...debugData,
+            lastApiCall: {
+              status: "success",
+              timestamp: new Date().toISOString(),
+            },
+            schedule: {
+              ...tempSchedules,
+              slots: tempSchedules.slots.slice(0, 5),
+            },
+          });
           CachedImage.clear();
           localStorage.setItem(SCHEDULED_JSON_KEY, JSON.stringify(tempSchedules));
           setSchedules(tempSchedules);
           setCurrentSlot(slots[getCurrentSlotIndex(slots)]);
         } else {
+          setDebugData({
+            ...debugData,
+            lastApiCall: {
+              status: "error",
+              message: "Received expired slots",
+              timestamp: new Date().toISOString(),
+            },
+          });
           console.log("Please request updating schedule to administrator!");
           setTimeout(getRemoteJson, 180000);  // retry to fetch after 3 minutes
         }
       })
       .catch((err) => {
+        setDebugData({
+          ...debugData,
+          lastApiCall: {
+            status: "error",
+            message: err.message,
+            timestamp: new Date().toISOString(),
+          },
+        });
         DEBUG_MODE &&
           console.error(
             "Could not fetch schedule from remote. Trying to load from local storage.",
@@ -242,6 +279,7 @@ const Home = () => {
 
   return (
     <>
+      {DEBUG_MODE && <DebugInfo debugData={debugData} />}
       <div
         className="rotate-90 origin-bottom-left"
         style={{ marginTop: schedules.screenHeight * -1 + "px" }}
