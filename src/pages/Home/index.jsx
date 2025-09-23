@@ -4,6 +4,7 @@ import _ from "lodash";
 import ScheduleService from "@/services/Schedule";
 
 import {
+  SCHEDULED_JSON_KEY,
   SCREEN_ID,
   DEBUG_MODE,
   GA4_EVENT_SLOT_TRANSITION,
@@ -98,6 +99,8 @@ const Home = () => {
         /// END parsing from remote format to local format ///
 
         if (!isExpiredSlots(slots)) {
+          CachedImage.clear();
+          localStorage.setItem(SCHEDULED_JSON_KEY, JSON.stringify(tempSchedules));
           setSchedules(tempSchedules);
           setCurrentSlot(slots[getCurrentSlotIndex(slots)]);
         } else {
@@ -108,16 +111,27 @@ const Home = () => {
       .catch((err) => {
         DEBUG_MODE &&
           console.error(
-            "Sorry, but an error has been ocurred while parsing schedule list!",
+            "Could not fetch schedule from remote. Trying to load from local storage.",
             err
           );
-          setTimeout(getRemoteJson, 30000); // retry to fetch after 30 seconds
+        let scheduleData = JSON.parse(
+          localStorage.getItem(SCHEDULED_JSON_KEY) || "{}"
+        ); // get local schedule json.
+        if (!_.isEmpty(scheduleData) && !isExpiredSlots(scheduleData.slots)) {
+          setSchedules(scheduleData); // else take the schedules from local storage
+          setCurrentSlot(
+            scheduleData.slots[getCurrentSlotIndex(scheduleData.slots)]
+          ); // load the slot to be displayed at the current
+        } else {
+          // if no local data or it's expired, retry fetching
+          setTimeout(getRemoteJson, 30000);
+        }
       });
   };
 
   // call at first loading component
   useEffect(() => {
-    getRemoteJson(); // if not exist yet, fetch json from remote
+    getRemoteJson();
   }, []);
 
   // call when should update the current slot
@@ -192,6 +206,7 @@ const Home = () => {
     const transitionSlot = () => {
       if (nextSlotIndex >= schedules.slots.length) {
         // no more slot for this period
+        localStorage.removeItem(SCHEDULED_JSON_KEY);
         // getRemoteJson(); // load new json for new period
         window.location.reload();
         return;
