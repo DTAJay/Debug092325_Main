@@ -33,7 +33,7 @@ const toDataUrl = (url, width, height, callback, outputFormat) => {
     callback(dataURL);
     canvas = null;
   };
-  img.src = url + '?t=' + new Date().getTime();
+  img.src = url;
 };
 
 // delete the given element
@@ -80,9 +80,14 @@ const get = (url, width, height) => {
   })
 };
 
+const clear = () => {
+  cache = [];
+}
+
 const CachedImage = {
   add,
-  get
+  get,
+  clear
 };
 
 export default CachedImage;
