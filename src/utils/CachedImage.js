@@ -33,7 +33,7 @@ const toDataUrl = (url, width, height, callback, outputFormat) => {
     callback(dataURL);
     canvas = null;
   };
-  img.src = url;
+  img.src = url + '?t=' + new Date().getTime();
 };
 
 // delete the given element

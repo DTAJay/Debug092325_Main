@@ -4,7 +4,6 @@ import _ from "lodash";
 import ScheduleService from "@/services/Schedule";
 
 import {
-  SCHEDULED_JSON_KEY,
   SCREEN_ID,
   DEBUG_MODE,
   GA4_EVENT_SLOT_TRANSITION,
@@ -99,7 +98,6 @@ const Home = () => {
         /// END parsing from remote format to local format ///
 
         if (!isExpiredSlots(slots)) {
-          localStorage.setItem(SCHEDULED_JSON_KEY, JSON.stringify(tempSchedules));  
           setSchedules(tempSchedules);
           setCurrentSlot(slots[getCurrentSlotIndex(slots)]);
         } else {
@@ -119,24 +117,7 @@ const Home = () => {
 
   // call at first loading component
   useEffect(() => {
-    let scheduleData = JSON.parse(
-      localStorage.getItem(SCHEDULED_JSON_KEY) || "{}"
-    ); // get local schedule json.
-
-    if (_.isEmpty(scheduleData)) {
-      getRemoteJson(); // if not exist yet, fetch json from remote
-    } else {
-      if (isExpiredSlots(scheduleData.slots)) {
-        // if existing json has been expired, remove it, and then, load new one
-        localStorage.removeItem(SCHEDULED_JSON_KEY);
-        getRemoteJson();
-      } else {
-        setSchedules(scheduleData); // else take the schedules from local storage
-        setCurrentSlot(
-          scheduleData.slots[getCurrentSlotIndex(scheduleData.slots)]
-        ); // load the slot to be displayed at the current
-      }
-    }
+    getRemoteJson(); // if not exist yet, fetch json from remote
   }, []);
 
   // call when should update the current slot
@@ -211,7 +192,6 @@ const Home = () => {
     const transitionSlot = () => {
       if (nextSlotIndex >= schedules.slots.length) {
         // no more slot for this period
-        localStorage.removeItem(SCHEDULED_JSON_KEY);
         // getRemoteJson(); // load new json for new period
         window.location.reload();
         return;

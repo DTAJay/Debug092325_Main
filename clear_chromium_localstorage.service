@@ -1,9 +1,0 @@
-[Unit]
-Description=Clear localstorage
-After=network.target
-
-[Service]
-ExecStart=/bin/bash /home/pi/clear_chromium_localstorage.sh
-
-[Install]
-WantedBy=multi-user.target
