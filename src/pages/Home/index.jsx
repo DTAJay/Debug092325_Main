@@ -239,25 +239,55 @@ const Home = () => {
       setPreloadedSlotIndex(preloadedSlotIndex + 1);
     }
 
+    // --- Top Ad Image Loading ---
+    if (!currentSlot?.adImageUrl) {
+      setDisplayError("Error: The 'adImageUrl' is missing from the JSON data for the current ad slot. Please check the source file.");
+      return;
+    }
+    if (!schedules.adWidth || !schedules.adHeight || schedules.adWidth <= 0 || schedules.adHeight <= 0) {
+      setDisplayError("Error: The ad dimensions (adWidth or adHeight) are missing or invalid in the JSON data. Please check the source file.");
+      return;
+    }
+
     // get current ad image from cache
     CachedImage.get(
       currentSlot?.adImageUrl,
       schedules.adWidth,
       schedules.adHeight
-    ).then(
-      (data) => setCurrentAdImage(data),
-      () => setCurrentAdImage("")
-    );
+    )
+      .then((data) => {
+        setCurrentAdImage(data);
+      })
+      .catch((err) => {
+        console.error("Ad image error:", err);
+        setDisplayError(`Error loading ad image. The URL may be invalid, or the image could not be fetched. Please check the browser console and the following URL: ${currentSlot?.adImageUrl}`);
+        setCurrentAdImage(""); // Ensure no broken image is shown
+      });
+
+    // --- Footer Image Loading ---
+    if (!currentSlot?.footerImageUrl) {
+      setDisplayError("Error: The 'footerImageUrl' is missing from the JSON data for the current ad slot. Please check the source file.");
+      return;
+    }
+    if (!schedules.footerWidth || !schedules.footerHeight || schedules.footerWidth <= 0 || schedules.footerHeight <= 0) {
+      setDisplayError("Error: The footer dimensions (footerWidth or footerHeight) are missing or invalid in the JSON data. Please check the source file.");
+      return;
+    }
 
     // get current footer image from cache
     CachedImage.get(
       currentSlot?.footerImageUrl,
       schedules.footerWidth,
       schedules.footerHeight
-    ).then(
-      (data) => setCurrentFooterImage(data),
-      () => setCurrentFooterImage("")
-    );
+    )
+      .then((data) => {
+        setCurrentFooterImage(data);
+      })
+      .catch((err) => {
+        console.error("Footer image error:", err);
+        setDisplayError(`Error loading footer image. The URL may be invalid, or the image could not be fetched. Please check the browser console and the following URL: ${currentSlot?.footerImageUrl}`);
+        setCurrentFooterImage(""); // Ensure no broken image is shown
+      });
 
     DEBUG_MODE && console.log(currentSlot);
 
