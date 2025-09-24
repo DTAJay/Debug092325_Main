@@ -83,6 +83,7 @@ const Home = () => {
           const slot = {
             id: item.slot_id, // slot's id
             timestamp: parseInt(item.ad_time, 16) * 1000, // parse timestamp to hex to dec. unit: milliseconds
+            ad_time: item.ad_time, // Keep the original ad_time for debugging
             deviceId: item.device_id,
             adAdvertiserId: item.AdvertiserTop,
             adGoogleAnalyticStreamId: item.IMGtopAnalytics,
