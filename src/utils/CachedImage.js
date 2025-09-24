@@ -19,7 +19,7 @@ const findMinIndex = (array, key) => {
 };
 
 // convert image url to base64
-const toDataUrl = (url, width, height, callback, outputFormat) => {
+const toDataUrl = (url, width, height, callback, errorCallback, outputFormat) => {
   var img = new Image(width, height);
   img.crossOrigin = "Anonymous";
   img.onload = function () {
@@ -33,6 +33,10 @@ const toDataUrl = (url, width, height, callback, outputFormat) => {
     callback(dataURL);
     canvas = null;
   };
+  img.onerror = function (err) {
+    errorCallback(err);
+    canvas = null;
+  };
   img.src = url;
 };
 
@@ -43,41 +47,81 @@ const prune = (index) => {
 
 // add new element
 const add = (url, width, height) => {
-  if (_.isEmpty(url) || _.isEmpty(width) || _.isEmpty(height)) return;
-  let temp = cache.find((element) => element.url === url);
-  if (_.isEmpty(temp)) { 
-    if (cache.length >= SIZE_OF_CACHE) {
-      let deletingIndex = findMinIndex(cache, "usage");
-      if (deletingIndex !== -1) {
-        prune(deletingIndex);
+  return new Promise((resolve, reject) => {
+    if (_.isEmpty(url) || _.isEmpty(width) || _.isEmpty(height)) {
+      return reject("URL or dimensions are empty.");
+    }
+    let temp = cache.find((element) => element.url === url);
+    if (_.isEmpty(temp)) {
+      if (cache.length >= SIZE_OF_CACHE) {
+        let deletingIndex = findMinIndex(cache, "usage");
+        if (deletingIndex !== -1) {
+          prune(deletingIndex);
+        }
+      }
+      cache.push({ url, usage: 0 });
+      let newCacheIndex = cache.length - 1;
+      toDataUrl(
+        url,
+        parseInt(width),
+        parseInt(height),
+        function (base64Img) { // success callback
+          cache[newCacheIndex].data = base64Img;
+          resolve(base64Img);
+        },
+        function (err) { // error callback
+          // If the image fails to load, remove it from the cache and reject the promise
+          prune(newCacheIndex);
+          reject(`Failed to load image: ${url}`);
+        }
+      );
+    } else {
+      // If the item is already in the cache, we might need to wait for its data
+      if (temp.data) {
+        temp.usage += 1;
+        resolve(temp.data);
+      } else {
+        // This is a tricky state - it's in the cache but not loaded yet.
+        // We'll retry getting it in a moment.
+        setTimeout(() => {
+          get(url, width, height).then(resolve, reject);
+        }, 500);
       }
     }
-    cache.push({ url, usage: 0 });
-    let newCacheIndex = cache.length - 1;
-    toDataUrl(url, parseInt(width), parseInt(height), function (base64Img) {
-      // Base64DataURL
-      cache[newCacheIndex].data = base64Img;
-      return base64Img;
-    });
-  }
+  });
 };
 
 // get element
 const get = (url, width, height) => {
   return new Promise((resolve, reject) => {
-    if (_.isEmpty(url) || _.isEmpty(width) || _.isEmpty(height)) reject("");
+    if (_.isEmpty(url) || _.isEmpty(width) || _.isEmpty(height)) {
+      return reject("URL or dimensions are empty.");
+    }
     let temp = cache.find((element) => element.url === url);
     if (_.isEmpty(temp)) {
-      resolve(add(url, width, height))
+      // If not in cache, add it. The add function now returns a promise.
+      add(url, width, height).then(resolve, reject);
     } else {
-      temp.usage += 1;
+      // If it is in the cache, check if data is loaded
+      if (temp.data) {
+        temp.usage += 1;
+        resolve(temp.data);
+      } else {
+        // It's in the cache but data is not ready, this can happen if multiple calls are made simultaneously.
+        // We'll wait and see if it loads. This is a simplified polling mechanism.
+        setTimeout(() => {
+          // Re-check the cache item directly
+          const updatedTemp = cache.find((element) => element.url === url);
+          if (updatedTemp && updatedTemp.data) {
+            resolve(updatedTemp.data);
+          } else {
+            // If it's still not loaded, it might have failed.
+            reject(`Timeout or failure waiting for image to load: ${url}`);
+          }
+        }, 1500); // Wait a bit longer for the image to potentially load/fail
+      }
     }
-    if (_.isEmpty(temp.data)) {
-      setTimeout(() => resolve(temp.data), 1000);
-    } else {
-      resolve(temp.data)
-    }
-  })
+  });
 };
 
 const clear = () => {
