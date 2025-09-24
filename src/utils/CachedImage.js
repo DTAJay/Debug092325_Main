@@ -20,23 +20,29 @@ const findMinIndex = (array, key) => {
 
 // convert image url to base64
 const toDataUrl = (url, width, height, callback, errorCallback, outputFormat) => {
-  var img = new Image(width, height);
+  let canvas = document.createElement("CANVAS");
+  const ctx = canvas.getContext("2d");
+  canvas.width = width;
+  canvas.height = height;
+
+  const img = new Image(width, height);
   img.crossOrigin = "Anonymous";
+
   img.onload = function () {
-    var canvas = document.createElement("CANVAS");
-    canvas.width = width;
-    canvas.height = height;
-    var ctx = canvas.getContext("2d");
-    var dataURL;
     ctx.drawImage(this, 0, 0, width, height);
-    dataURL = canvas.toDataURL(outputFormat);
+    const dataURL = canvas.toDataURL(outputFormat);
     callback(dataURL);
+    // Cleanup
     canvas = null;
   };
-  img.onerror = function (err) {
-    errorCallback(err);
+
+  img.onerror = function (event) {
+    // The event itself is not a detailed error object, so we just trigger the generic error callback.
+    errorCallback(event);
+    // Cleanup
     canvas = null;
   };
+
   img.src = url;
 };
 
