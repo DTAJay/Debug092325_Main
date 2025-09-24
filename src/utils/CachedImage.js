@@ -39,8 +39,6 @@ const toDataUrl = (url, width, height, callback, errorCallback, outputFormat) =>
   img.onerror = function (event) {
     // The event itself is not a detailed error object, so we just trigger the generic error callback.
     errorCallback(event);
-    // Cleanup
-    canvas = null;
   };
 
   img.src = url;
