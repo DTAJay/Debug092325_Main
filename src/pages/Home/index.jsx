@@ -62,6 +62,7 @@ const Home = () => {
   const [currentFooterImage, setCurrentFooterImage] = useState("");
   const [preloadedSlotIndex, setPreloadedSlotIndex] = useState();
   const [debugData, setDebugData] = useState(null);
+  const [displayError, setDisplayError] = useState(null);
 
   // call when should load new remote json
   const getRemoteJson = () => {
@@ -108,6 +109,26 @@ const Home = () => {
           slots,
         };
         /// END parsing from remote format to local format ///
+
+        // Check for invalid timestamps
+        const hasInvalidTimestamp = slots.some(slot => isNaN(slot.timestamp));
+        if (hasInvalidTimestamp) {
+          setDisplayError("Error: Invalid 'ad_time' in JSON. One or more ad slots have a missing or invalid time value, which prevents the schedule from loading. Please check the source JSON file.");
+          // Also update debug data to show the error
+          setDebugData({
+            ...debugData,
+            lastApiCall: {
+              status: "error",
+              message: "One or more slots have an invalid timestamp.",
+              timestamp: new Date().toISOString(),
+            },
+            schedule: {
+              ...tempSchedules,
+              slots: tempSchedules.slots.slice(0, 5),
+            },
+          });
+          return; // Stop further processing
+        }
 
         if (!isExpiredSlots(slots)) {
           setDebugData({
@@ -277,6 +298,25 @@ const Home = () => {
       clearTimeout(timeout);
     };
   }, [currentSlot]);
+
+  if (displayError) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#ffdddd',
+        color: '#d8000c',
+        padding: '20px',
+        fontSize: '24px',
+        textAlign: 'center',
+        border: '2px solid #d8000c',
+      }}>
+        {displayError}
+      </div>
+    );
+  }
 
   return (
     <>
