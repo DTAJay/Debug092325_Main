@@ -11,7 +11,6 @@ import {
   AD_POSITION_BOTTOM,
   AD_POSITION_TOP,
 } from "@/utils/Constants";
-import CachedImage from "@/utils/CachedImage";
 import GoogleAnalytics from "@/utils/GoogleAnalytics";
 
 // get given slot's duration
@@ -53,27 +52,16 @@ const isExpiredSlots = (slots) => {
   );
 };
 
-import DebugInfo from "@/components/DebugInfo";
-
 const Home = () => {
   const [schedules, setSchedules] = useState({}); // schedule data
   const [currentSlot, setCurrentSlot] = useState({}); // current displaying slot
   const [currentAdImage, setCurrentAdImage] = useState("");
   const [currentFooterImage, setCurrentFooterImage] = useState("");
-  const [preloadedSlotIndex, setPreloadedSlotIndex] = useState();
-  const [debugData, setDebugData] = useState(null);
   const [displayError, setDisplayError] = useState(null);
 
   // call when should load new remote json
   const getRemoteJson = () => {
     // call the axios instance for fetching the remote json
-    setDebugData({
-      ...debugData,
-      lastApiCall: {
-        status: "loading",
-        timestamp: new Date().toISOString(),
-      },
-    });
     ScheduleService.getSchedule()
       .then((res) => {
         const remoteJson = res.data;
@@ -84,7 +72,6 @@ const Home = () => {
           const slot = {
             id: item.slot_id, // slot's id
             timestamp: parseInt(item.ad_time, 16) * 1000, // parse timestamp to hex to dec. unit: milliseconds
-            ad_time: item.ad_time, // Keep the original ad_time for debugging
             deviceId: item.device_id,
             adAdvertiserId: item.AdvertiserTop,
             adGoogleAnalyticStreamId: item.IMGtopAnalytics,
@@ -110,64 +97,16 @@ const Home = () => {
         };
         /// END parsing from remote format to local format ///
 
-        // Check for invalid timestamps
-        const hasInvalidTimestamp = slots.some(slot => isNaN(slot.timestamp));
-        if (hasInvalidTimestamp) {
-          setDisplayError("Error: Invalid 'ad_time' in JSON. One or more ad slots have a missing or invalid time value, which prevents the schedule from loading. Please check the source JSON file.");
-          // Also update debug data to show the error
-          setDebugData({
-            ...debugData,
-            lastApiCall: {
-              status: "error",
-              message: "One or more slots have an invalid timestamp.",
-              timestamp: new Date().toISOString(),
-            },
-            schedule: {
-              ...tempSchedules,
-              slots: tempSchedules.slots.slice(0, 5),
-            },
-          });
-          return; // Stop further processing
-        }
-
         if (!isExpiredSlots(slots)) {
-          setDebugData({
-            ...debugData,
-            lastApiCall: {
-              status: "success",
-              timestamp: new Date().toISOString(),
-            },
-            schedule: {
-              ...tempSchedules,
-              slots: tempSchedules.slots.slice(0, 5),
-            },
-          });
-          CachedImage.clear();
           localStorage.setItem(SCHEDULED_JSON_KEY, JSON.stringify(tempSchedules));
           setSchedules(tempSchedules);
           setCurrentSlot(slots[getCurrentSlotIndex(slots)]);
         } else {
-          setDebugData({
-            ...debugData,
-            lastApiCall: {
-              status: "error",
-              message: "Received expired slots",
-              timestamp: new Date().toISOString(),
-            },
-          });
           console.log("Please request updating schedule to administrator!");
           setTimeout(getRemoteJson, 180000);  // retry to fetch after 3 minutes
         }
       })
       .catch((err) => {
-        setDebugData({
-          ...debugData,
-          lastApiCall: {
-            status: "error",
-            message: err.message,
-            timestamp: new Date().toISOString(),
-          },
-        });
         DEBUG_MODE &&
           console.error(
             "Could not fetch schedule from remote. Trying to load from local storage.",
@@ -193,130 +132,66 @@ const Home = () => {
     getRemoteJson();
   }, []);
 
-  // call when should update the current slot
+  // This effect handles the display logic when the current ad slot changes
   useEffect(() => {
-    if (_.isEmpty(currentSlot)) {
+    if (_.isEmpty(currentSlot) || _.isEmpty(schedules)) {
       return;
     }
 
-    let nextSlotIndex =
-      _.findIndex(
-        schedules.slots,
-        (e) => {
-          return e?.id === currentSlot.id;
-        },
-        0
-      ) + 1;
+    // --- Production Behavior: Directly set image URLs ---
+    // In production, we just set the URL. If the URL is invalid, the browser's
+    // background-image property will fail silently, which is the desired behavior.
+    setCurrentAdImage(currentSlot.adImageUrl || "");
+    setCurrentFooterImage(currentSlot.footerImageUrl || "");
 
-    // preload images for the next 120 slots
-    if (preloadedSlotIndex === undefined) {
-      let currentPreloadedIndex = nextSlotIndex - 1;
-      let preloadingIndex = currentPreloadedIndex + 120;
-      if(preloadingIndex >= schedules.slots.length) {
-        preloadingIndex = schedules.slots.length - 1;
+    // --- Debug-Only: Check for image loading errors ---
+    // In debug mode, we can be more explicit about errors.
+    if (DEBUG_MODE) {
+      // Check top ad image
+      if (currentSlot.adImageUrl) {
+        const adImg = new Image();
+        adImg.src = currentSlot.adImageUrl;
+        adImg.onerror = () => {
+          setDisplayError(`DEBUG: Ad image failed to load. Check URL: ${currentSlot.adImageUrl}`);
+        };
+      } else {
+        setDisplayError("DEBUG: Ad image URL is missing in the current slot.");
       }
-      for (; currentPreloadedIndex < preloadingIndex; currentPreloadedIndex++) {
-        const slot = schedules.slots[currentPreloadedIndex];
-        CachedImage.add(slot.adImageUrl, schedules.adWidth, schedules.adHeight);
-        CachedImage.add(
-          slot.footerImageUrl,
-          schedules.footerWidth,
-          schedules.footerHeight
-        );
+
+      // Check footer image
+      if (currentSlot.footerImageUrl) {
+        const footerImg = new Image();
+        footerImg.src = currentSlot.footerImageUrl;
+        footerImg.onerror = () => {
+          setDisplayError(`DEBUG: Footer image failed to load. Check URL: ${currentSlot.footerImageUrl}`);
+        };
+      } else {
+        setDisplayError("DEBUG: Footer image URL is missing in the current slot.");
       }
-      setPreloadedSlotIndex(preloadingIndex);
-    } else if (preloadedSlotIndex < schedules.slots.length - 1) {
-      CachedImage.add(
-        schedules.slots[preloadedSlotIndex + 1].adImageUrl,
-        schedules.adWidth,
-        schedules.adHeight
-      );
-      CachedImage.add(
-        schedules.slots[preloadedSlotIndex + 1].footerImageUrl,
-        schedules.footerWidth,
-        schedules.footerHeight
-      );
-      setPreloadedSlotIndex(preloadedSlotIndex + 1);
     }
 
-    // --- Top Ad Image Loading ---
-    if (!currentSlot?.adImageUrl) {
-      setDisplayError("Error: The 'adImageUrl' is missing from the JSON data for the current ad slot. Please check the source file.");
-      return;
-    }
-    if (!schedules.adWidth || !schedules.adHeight || schedules.adWidth <= 0 || schedules.adHeight <= 0) {
-      setDisplayError("Error: The ad dimensions (adWidth or adHeight) are missing or invalid in the JSON data. Please check the source file.");
-      return;
-    }
+    // --- Core Timing Logic ---
+    const nextSlotIndex = _.findIndex(schedules.slots, (e) => e.id === currentSlot.id) + 1;
 
-    // get current ad image from cache
-    CachedImage.get(
-      currentSlot?.adImageUrl,
-      schedules.adWidth,
-      schedules.adHeight
-    )
-      .then((data) => {
-        setCurrentAdImage(data);
-      })
-      .catch((err) => {
-        console.error("Ad image error:", err);
-        setDisplayError(`Error loading ad image. The URL may be invalid, or the image could not be fetched. Please check the browser console and the following URL: ${currentSlot?.adImageUrl}`);
-        setCurrentAdImage(""); // Ensure no broken image is shown
-      });
-
-    // --- Footer Image Loading ---
-    if (!currentSlot?.footerImageUrl) {
-      setDisplayError("Error: The 'footerImageUrl' is missing from the JSON data for the current ad slot. Please check the source file.");
-      return;
-    }
-    if (!schedules.footerWidth || !schedules.footerHeight || schedules.footerWidth <= 0 || schedules.footerHeight <= 0) {
-      setDisplayError("Error: The footer dimensions (footerWidth or footerHeight) are missing or invalid in the JSON data. Please check the source file.");
-      return;
-    }
-
-    // get current footer image from cache
-    CachedImage.get(
-      currentSlot?.footerImageUrl,
-      schedules.footerWidth,
-      schedules.footerHeight
-    )
-      .then((data) => {
-        setCurrentFooterImage(data);
-      })
-      .catch((err) => {
-        console.error("Footer image error:", err);
-        setDisplayError(`Error loading footer image. The URL may be invalid, or the image could not be fetched. Please check the browser console and the following URL: ${currentSlot?.footerImageUrl}`);
-        setCurrentFooterImage(""); // Ensure no broken image is shown
-      });
-
-    DEBUG_MODE && console.log(currentSlot);
-
-    // update the current slot
     const transitionSlot = () => {
       if (nextSlotIndex >= schedules.slots.length) {
-        // no more slot for this period
         localStorage.removeItem(SCHEDULED_JSON_KEY);
-        // getRemoteJson(); // load new json for new period
         window.location.reload();
         return;
       }
-      setCurrentSlot(schedules.slots[nextSlotIndex]); // update the slot to be displayed
+      setCurrentSlot(schedules.slots[nextSlotIndex]);
     };
 
-    let timeout = setTimeout(
-      transitionSlot,
-      getSlotDuration(schedules.slots, nextSlotIndex - 1) -
-        (new Date().getTime() - currentSlot.timestamp)
-    ); // call callback after remained time
+    const timeoutDuration = getSlotDuration(schedules.slots, nextSlotIndex - 1) - (new Date().getTime() - currentSlot.timestamp);
+    const timeout = setTimeout(transitionSlot, timeoutDuration);
 
-    // send ad-play event
+    // --- Analytics ---
     GoogleAnalytics.emitEvent(GA4_EVENT_SLOT_TRANSITION, {
-      advertiser_id: currentSlot.adAdvertiserId, // custom dimension - advertiser's id
-      ad_position: AD_POSITION_TOP, // custom dimension - ad's position
-      device_id: currentSlot.deviceId, // custom dimension - device's id
-      screen_id: schedules.screenId, // custom dimension - screen's id
+      advertiser_id: currentSlot.adAdvertiserId,
+      ad_position: AD_POSITION_TOP,
+      device_id: currentSlot.deviceId,
+      screen_id: schedules.screenId,
     });
-    // send footer-play event
     GoogleAnalytics.emitEvent(GA4_EVENT_SLOT_TRANSITION, {
       advertiser_id: currentSlot.footerAdvertiserId,
       ad_position: AD_POSITION_BOTTOM,
@@ -324,12 +199,10 @@ const Home = () => {
       screen_id: schedules.screenId,
     });
 
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [currentSlot]);
+    return () => clearTimeout(timeout);
+  }, [currentSlot, schedules]);
 
-  if (displayError) {
+  if (DEBUG_MODE && displayError) {
     return (
       <div style={{
         display: 'flex',
@@ -350,7 +223,6 @@ const Home = () => {
 
   return (
     <>
-      {DEBUG_MODE && <DebugInfo debugData={debugData} />}
       <div
         className="rotate-90 origin-bottom-left"
         style={{ marginTop: schedules.screenHeight * -1 + "px" }}
